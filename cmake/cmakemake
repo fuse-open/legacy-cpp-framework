@@ -1,0 +1,261 @@
+#!/bin/bash
+set -e
+
+while [ $# -gt 0 ]; do
+    OPT=$1
+
+    case $OPT in
+    -j|-D|-U|-G)
+        shift
+        OPT="$OPT$1"
+        ;;
+    esac
+
+    case $OPT in
+    -h|-\?|--help)
+        cat <<E0
+Usage: cmakemake [options] [project-dir]
+
+Available options:
+
+  --debug               Debug build
+  --release             Release build (default)
+  --no-build            Generate project, but don't build
+  --platform=NAME       Build for another platform (see below)
+  --arch=NAMES          Build specific architecture(s)
+  --prefix=PATH         Set install prefix
+  -j<NUMBER>            Set compiler job count
+  -D<VARIABLE>=VALUE    Define a cmake variable
+  -U<VARIABLE>          Undefine a cmake variable
+  -G<GENERATOR>         Use a cmake generator
+
+Supported platforms:
+
+  * (empty)             Build binaries for current platform
+  * Android             Build Android binaries (armeabi-v7a)
+  * iOS                 Build iOS binaries (OS, SIMULATOR) (OS X only)
+  * Xcode               Build using Xcode (Debug, Release) (OS X only)
+
+Build script for CMake projects.
+
+This command wraps 'cmake && make' with some additional benefits:
+  - Optimized release build by default, unless --debug or DEBUG=1
+  - Out of source builds with debug and release built to separate folders
+  - Parallel builds out of the box
+  - MSYS/MinGW support (Windows only)
+  - Xcode batch builds (OS X only)
+  - iOS + Android cross builds
+
+Additional arguments to cmake can be passed using environment variable CMAKE_ARGS.
+E0
+        exit 1
+        ;;
+    --debug)
+        DEBUG=1
+        ;;
+    --release)
+        DEBUG=0
+        ;;
+    --no-build)
+        DO_BUILD=0
+        ;;
+    --platform=*)
+        PLATFORM=`echo ${OPT:11} | tr '[:upper:]' '[:lower:]'`
+        ;;
+    --archs=*)
+        ARCHS=${OPT:8}
+        ;;
+    --prefix=*)
+        CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${OPT:9}"
+        ;;
+    -D*|-U*|-G*)
+        CMAKE_ARGS="$CMAKE_ARGS -${OPT:1}"
+        ;;
+    -j*)
+        JOB_COUNT="${OPT:2}"
+        ;;
+    --)
+        shift
+        break
+        ;;
+    *)
+        if [ $# -eq 1 ]; then
+            break
+        else
+            echo "ERROR: Unable to parse arguments '$*'\n\nType 'cmakemake --help' for usage." >&2
+            exit 1
+        fi
+        ;;
+    esac
+
+    shift
+done
+
+PROJECT_DIR="$*"
+if [ -z "$PROJECT_DIR" ]; then
+    PROJECT_DIR=.
+fi
+
+set --
+
+#echo "'$DO_BUILD' '$DEBUG' '$TARGET' '$JOB_COUNT' '$CMAKE_ARGS' '$PROJECT_DIR'" && exit 1
+
+cd "`dirname "$0"`"
+CMAKE_DIR=`pwd -P`
+cd "$OLDPWD"
+cd "$PROJECT_DIR"
+PROJECT_DIR=`pwd -P`
+
+if [ "$DEBUG" = "1" ]; then
+    BUILD_TYPE="Debug"
+else
+    BUILD_TYPE="Release"
+fi
+
+BUILD_DIR="build/$BUILD_TYPE"
+CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
+
+if ! which cmake > /dev/null 2>&1; then
+    echo "ERROR: Unable to find 'cmake'. Make sure CMake is installed and added to PATH." >&2
+    exit 1
+fi
+
+if [ -z "$JOB_COUNT" ]; then
+    if [ -f /proc/cpuinfo ]; then
+        JOB_COUNT=`grep processor /proc/cpuinfo | wc -l`
+    elif [ "`uname`" = "Darwin" ]; then
+        JOB_COUNT=`sysctl hw.ncpu | cut -d " " -f 2`
+    elif [ -n "$NUMBER_OF_PROCESSORS" ]; then
+        JOB_COUNT=$NUMBER_OF_PROCESSORS
+    else
+        JOB_COUNT=1
+    fi
+fi
+
+if [ "$DO_BUILD" != "0" ]; then
+    case $DEBUG in
+    0)
+        CONFIGS="Release"
+        ;;
+    1)
+        CONFIGS="Debug"
+        ;;
+    *)
+        CONFIGS="Release Debug"
+        ;;
+    esac
+else
+    CONFIGS=""
+fi
+
+if [ -n "$PLATFORM" ]; then
+    case $PLATFORM in
+    xcode)
+        mkdir -p build/Xcode
+        cd build/Xcode
+
+        cmake ../.. -GXcode $CMAKE_ARGS
+
+        for cfg in $CONFIGS; do
+            xcodebuild -alltargets -configuration "$cfg"
+        done
+        ;;
+    ios)
+        if [ -z "$ARCHS" ]; then
+            ARCHS="OS SIMULATOR"
+        fi
+
+        for arch in $ARCHS; do
+            mkdir -p "build/iOS/$arch"
+            cd "build/iOS/$arch"
+
+            cmake ../../.. $CMAKE_ARGS -GXcode -DCMAKE_TOOLCHAIN_FILE="$CMAKE_DIR/toolchain/iOS.cmake" -DIOS_PLATFORM="$arch"
+
+            for cfg in $CONFIGS; do
+                xcodebuild -alltargets -configuration "$cfg"
+            done
+
+            cd "$PROJECT_DIR"
+        done
+        ;;
+    android)
+        if ! which ndk-build > /dev/null 2>&1; then
+            echo "ERROR: Unable to find 'ndk-build'. Make sure Android NDK is installed and added to PATH." >&2
+            exit 1
+        fi
+
+        if [ -z "$ARCHS" ]; then
+            ARCHS="armeabi-v7a x86"
+        fi
+
+        for arch in $ARCHS; do
+            BUILD_DIR="build/android/$BUILD_TYPE-$arch"
+
+            mkdir -p "$BUILD_DIR"
+            cd "$BUILD_DIR"
+
+            NDK_FILENAME=`which ndk-build`
+            while [ -h "$NDK_FILENAME" ]; do # resolve $NDK_FILENAME until the file is no longer a symlink
+                DIR="$( cd -P "$( dirname "$NDK_FILENAME" )" && pwd )"
+                NDK_FILENAME="$(readlink "$NDK_FILENAME")"
+                [[ "$NDK_FILENAME" != /* ]] && NDK_FILENAME="$DIR/$NDK_FILENAME" # if $NDK_FILENAME was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+            done
+
+            NDK_DIR=`dirname "$NDK_FILENAME"`
+            TOOLCHAIN_FILE="$CMAKE_DIR/toolchain/android.toolchain.cmake"
+
+            set --
+
+            if [ "$OSTYPE" = "msys" ]; then
+                if [ -d "$NDK_DIR/prebuilt/windows-x86_64/bin" ]; then
+                    MAKE_DIR="$NDK_DIR/prebuilt/windows-x86_64/bin"
+                elif [ -d "$NDK_DIR/prebuilt/windows-x86_32/bin" ]; then
+                    MAKE_DIR="$NDK_DIR/prebuilt/windows-x86_32/bin"
+                else
+                    MAKE_DIR="$NDK_DIR/prebuilt/windows/bin"
+                fi
+
+                CMAKE_FILENAME=`which cmake`
+                PATH="$MAKE_DIR:`dirname "$CMAKE_FILENAME"`"
+                set -- -G"MinGW Makefiles" -DCMAKE_MAKE_PROGRAM="make.exe"
+            #elif which ninja 2>&1 > /dev/null; then
+                #set -- -G"Ninja Makefiles"
+            fi
+
+            set -- -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" "$@"
+            set -- -DANDROID_NDK="$NDK_DIR" -DANDROID_ABI="$arch" "$@"
+            set -- -DANDROID_NATIVE_API_LEVEL="android-9" -DANDROID_STL="stlport_shared" "$@"
+
+            cmake "$@" $CMAKE_ARGS ../../..
+
+            if [ "$DO_BUILD" != "0" ]; then
+                cmake --build . --use-stderr -- -j$JOB_COUNT
+            fi
+
+            cd "$PROJECT_DIR"
+        done
+        ;;
+    *)
+        echo "ERROR: Invalid platform '$PLATFORM'.\n\nType 'cmakemake --help' for usage." >&2
+        exit 1
+        ;;
+    esac
+else
+    mkdir -p "$BUILD_DIR"
+    cd "$BUILD_DIR"
+
+    if [ "$OSTYPE" = "msys" ]; then
+        CMAKE_FILENAME=`which cmake`
+        GCC_FILENAME=`which gcc`
+        PATH="`dirname "$CMAKE_FILENAME"`:`dirname "$GCC_FILENAME"`"
+        set -- -G"MinGW Makefiles"
+    #elif which ninja 2>&1 > /dev/null; then
+        #set -- -G"Ninja Makefiles"
+    fi
+
+    cmake "$@" $CMAKE_ARGS ../..
+
+    if [ "$DO_BUILD" != "0" ]; then
+        cmake --build . --use-stderr -- -j$JOB_COUNT
+    fi
+fi

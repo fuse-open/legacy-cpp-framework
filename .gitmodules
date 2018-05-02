@@ -1,0 +1,27 @@
+[submodule "3rdparty/ios-deploy"]
+	path = 3rdparty/ios-deploy
+	url = ../../phonegap/ios-deploy
+[submodule "3rdparty/libpng"]
+	path = 3rdparty/libpng
+	url = ../../glennrp/libpng
+	ignore = dirty
+[submodule "3rdparty/zlib"]
+	path = 3rdparty/zlib
+	url = ../../madler/zlib
+[submodule "3rdparty/freetype2"]
+	path = 3rdparty/freetype2
+	url = git://git.sv.nongnu.org/freetype/freetype2.git
+[submodule "3rdparty/curl"]
+	path = 3rdparty/curl
+	url = ../../bagder/curl
+	ignore = dirty
+[submodule "3rdparty/glew"]
+	path = 3rdparty/glew
+	url = ../../LuaDist/glew
+	ignore = dirty
+[submodule "3rdparty/sdl2"]
+	path = 3rdparty/sdl2
+	url = ../../spurious/SDL-mirror.git
+[submodule "3rdparty/libjpeg"]
+	path = 3rdparty/libjpeg
+	url = ../../winlibs/libjpeg.git
