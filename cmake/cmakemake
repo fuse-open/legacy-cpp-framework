@@ -209,7 +209,7 @@ if [ -n "$PLATFORM" ]; then
         fi
 
         if [ -z "$ARCHS" ]; then
-            ARCHS="armeabi-v7a x86"
+            ARCHS="armeabi-v7a"
         fi
 
         for arch in $ARCHS; do
