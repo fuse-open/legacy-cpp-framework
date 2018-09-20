@@ -236,7 +236,7 @@ if [ -n "$PLATFORM" ]; then
 
             set -- -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" "$@"
             set -- -DANDROID_ABI="$arch" "$@"
-            set -- -DANDROID_PLATFORM="android-9" "$@"
+            set -- -DANDROID_PLATFORM="android-16" "$@"
             set -- -DANDROID_STL="stlport_shared" "$@"
 
             cmake "$@" $CMAKE_ARGS ../../..
