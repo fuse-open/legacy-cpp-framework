@@ -5,6 +5,7 @@
 #include <EGL/egl.h>
 #include <uBase/Console.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef ANDROID
 # include <android/native_window.h>
