@@ -179,20 +179,15 @@ if [ -n "$PLATFORM" ]; then
         done
         ;;
     android)
-        if ! which ndk-build > /dev/null 2>&1; then
-            echo "ERROR: Unable to find 'ndk-build'. Make sure Android NDK is installed and added to PATH." >&2
-            exit 1
-        fi
-
-        if [ -z "$ARCHS" ]; then
-            ARCHS="armeabi-v7a x86"
-        fi
-
-        for arch in $ARCHS; do
-            BUILD_DIR="build/android/$BUILD_TYPE-$arch"
-
-            mkdir -p "$BUILD_DIR"
-            cd "$BUILD_DIR"
+        if [ -f "$LOCALAPPDATA/Android/sdk/ndk-bundle/ndk-build.cmd" ]; then
+            NDK_DIR="$LOCALAPPDATA/Android/sdk/ndk-bundle"
+        elif [ -f "$HOME/Library/Android/sdk/ndk-bundle/ndk-build" ]; then
+            NDK_DIR="$HOME/Library/Android/sdk/ndk-bundle"
+        else
+            if ! which ndk-build > /dev/null 2>&1; then
+                echo "ERROR: Unable to find 'ndk-build'. Make sure Android NDK is installed and added to PATH." >&2
+                exit 1
+            fi
 
             NDK_FILENAME=`which ndk-build`
             while [ -h "$NDK_FILENAME" ]; do # resolve $NDK_FILENAME until the file is no longer a symlink
@@ -202,10 +197,27 @@ if [ -n "$PLATFORM" ]; then
             done
 
             NDK_DIR=`dirname "$NDK_FILENAME"`
-            TOOLCHAIN_FILE="$CMAKE_DIR/toolchain/android.toolchain.cmake"
+            if [ -d "$NDK_DIR/../prebuilt" ]; then
+                NDK_DIR="$NDK_DIR/.."
+            fi
+        fi
+
+        TOOLCHAIN_FILE="$NDK_DIR/build/cmake/android.toolchain.cmake"
+        if [ ! -f "$TOOLCHAIN_FILE" ]; then
+             echo "ERROR: Unable to find '$TOOLCHAIN_FILE'. Make sure Android NDK r13 or newer is installed." >&2
+             exit 1
+        fi
+
+        if [ -z "$ARCHS" ]; then
+            ARCHS="armeabi-v7a"
+        fi
+
+        for arch in $ARCHS; do
+            BUILD_DIR="build/android/$BUILD_TYPE-$arch"
+            mkdir -p "$BUILD_DIR"
+            cd "$BUILD_DIR"
 
             set --
-
             if [ "$OSTYPE" = "msys" ]; then
                 if [ -d "$NDK_DIR/prebuilt/windows-x86_64/bin" ]; then
                     MAKE_DIR="$NDK_DIR/prebuilt/windows-x86_64/bin"
@@ -223,8 +235,9 @@ if [ -n "$PLATFORM" ]; then
             fi
 
             set -- -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" "$@"
-            set -- -DANDROID_NDK="$NDK_DIR" -DANDROID_ABI="$arch" "$@"
-            set -- -DANDROID_NATIVE_API_LEVEL="android-9" -DANDROID_STL="stlport_shared" "$@"
+            set -- -DANDROID_ABI="$arch" "$@"
+            set -- -DANDROID_PLATFORM="android-16" "$@"
+            set -- -DANDROID_STL="c++_static" "$@"
 
             cmake "$@" $CMAKE_ARGS ../../..
 
