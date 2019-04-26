@@ -93,15 +93,7 @@ Specific architectures can be built by providing the `--archs=` option in step 2
 - libpng
 - libsdl2
 
-**APT** users can execute `sudo apt-get install -y libpng12-dev libjpeg-dev libfreetype6-dev libglew-dev libcurl4-openssl-dev cmake g++`
-
-[SDL2] can be built and installed from source. To install from Mercurial, do this:
-
-    hg clone http://hg.libsdl.org/SDL
-    cd SDL
-    ./configure
-    make -j 4
-    sudo make install
+**APT** users can execute `sudo apt-get install -y libpng-dev libjpeg-dev libfreetype6-dev libsdl2-dev libglew-dev libcurl4-openssl-dev cmake g++`
 
 ### Instructions
 
