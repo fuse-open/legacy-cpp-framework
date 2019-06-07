@@ -209,9 +209,10 @@ if [ -n "$PLATFORM" ]; then
         fi
 
         if [ -z "$ARCHS" ]; then
-            ARCHS="armeabi-v7a"
+            ARCHS="armeabi-v7a arm64-v8a x86 x86_64"
         fi
 
+        OLD_PATH=$PATH
         for arch in $ARCHS; do
             BUILD_DIR="build/android/$BUILD_TYPE-$arch"
             mkdir -p "$BUILD_DIR"
@@ -242,10 +243,11 @@ if [ -n "$PLATFORM" ]; then
             cmake "$@" $CMAKE_ARGS ../../..
 
             if [ "$DO_BUILD" != "0" ]; then
-                cmake --build . --use-stderr -- -j$JOB_COUNT
+                cmake --build . --use-stderr -- -j$JOB_COUNT -s
             fi
 
             cd "$PROJECT_DIR"
+            PATH=$OLD_PATH
         done
         ;;
     *)
