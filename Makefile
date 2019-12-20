@@ -4,7 +4,7 @@ default:
 android:
 	cmake/cmakemake --platform=Android
 
-ios: bin/ios-deploy
+ios:
 	cmake/cmakemake --platform=iOS
 
 xcode:
@@ -23,10 +23,3 @@ clean:
 
 install:
 	make install --dir=build/Release
-
-bin/ios-deploy: | bin
-	xcodebuild -project 3rdparty/ios-deploy/ios-deploy.xcodeproj
-	cp -f 3rdparty/ios-deploy/build/Release/ios-deploy bin
-
-bin:
-	mkdir bin
