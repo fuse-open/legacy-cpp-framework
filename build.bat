@@ -1,11 +1,11 @@
 @echo off
 pushd "%~dp0"
-set GENERATOR=Visual Studio 15 2017
+set GENERATOR=Visual Studio 16 2019
 
 rem Generate and build (x64)
 mkdir build\x64
 pushd build\x64
-cmake -G"%GENERATOR% Win64" "%~dp0" || goto ERROR
+cmake -G"%GENERATOR%" -A"x64" "%~dp0" || goto ERROR
 cmake --build . --use-stderr -- /p:Configuration=Debug /m || goto ERROR
 cmake --build . --use-stderr -- /p:Configuration=Release /m || goto ERROR
 popd
