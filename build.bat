@@ -1,6 +1,6 @@
 @echo off
 pushd "%~dp0"
-set GENERATOR=Visual Studio 16 2019
+set GENERATOR=Visual Studio 17 2022
 
 rem Generate and build (x64)
 mkdir build\x64
