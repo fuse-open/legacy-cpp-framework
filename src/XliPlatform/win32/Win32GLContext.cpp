@@ -103,7 +103,6 @@ namespace Xli
                             continue;
                         }
 
-                        Error->WriteLine("WGL WARNING: Unable to find any multisampled OpenGL formats");
                         return -1;
                     }
 
